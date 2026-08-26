@@ -1,90 +1,219 @@
 # Self-Evaluating Lesson Content Generator
 
-An agentic, self-evaluating RAG lesson generator built for the GenAI Engineer - Content Systems role.
+A self-evaluating lesson generator built for the NxtWave GenAI Engineer Content Systems take-home assessment.
 
-This system takes a topic ("Introduction to RAG") and autonomously generates, evaluates, and regenerates a beginner-friendly lesson until the lesson passes or the bounded retry limit is reached. The system features bounded retries, explicit failure handling, and deterministic validation. Real-provider behavior is validated separately in the end-to-end demo.
+The system generates a beginner-friendly lesson, evaluates the lesson against a strict quality rubric, and regenerates it when the lesson does not meet the required quality bar.
 
-## 🔗 Assessment Evidence
-- **Loom Walkthrough**: [INSERT_LOOM_VIDEO_LINK_HERE]
-- **Final Notion/Google Doc**: [INSERT_DOCUMENT_LINK_HERE]
-- **Audit Reports**: See [FINAL_SUBMISSION_READINESS_REPORT.md](./FINAL_SUBMISSION_READINESS_REPORT.md) and [FINAL_NXTWAVE_ASSESSMENT_AUDIT.md](./FINAL_NXTWAVE_ASSESSMENT_AUDIT.md) for full compliance verification.
+The assessment topic is:
+**Introduction to RAG**
 
-## 🧠 Design Decisions & Trade-offs
+## Overview
 
-### Why LangGraph?
-The workflow contains conditional routing and bounded regeneration. LangGraph makes those states explicit and testable compared to a linear chain.
+The system follows a bounded generation and evaluation loop:
 
-### Why two models?
-Generation is a high-volume task, so the lower-cost `gemini-3.5-flash-lite` handles drafts. Evaluation is a higher-risk task, so the stronger `gemini-3.7-flash` handles quality judgment via Structured Outputs.
-
-**Note for assessment reviewers:** During development and for the recorded Loom demonstration, the evaluator model was temporarily set to `gemini-flash-lite-latest` because the free-tier quota for `gemini-3.7-flash` was exhausted (resulting in `429 RESOURCE_EXHAUSTED`) and other models were not available on this API key. The intended production architecture, and the default configured in `config.py`, uses `gemini-3.7-flash`.
-
-### Why SQLite?
-Memory consists mainly of structured failure history and learned guidance. A relational store is sufficient and simpler than a vector database.
-
-### Why no vector database or LiteLLM/FastAPI?
-The assessment evaluates the workflow logic and lesson generation, not a web API or production RAG retrieval system. The curated reference file is enough for deterministic grounding. Extra abstraction layers would add complexity without solving a core requirement.
-
-### Why maximum two retries?
-Controls latency, cost, and guarantees termination.
-
-### Why controlled self-evolution?
-The system learns recurring failure categories across distinct runs without allowing the evaluator to rewrite its own quality bar.
-
-## 📋 The 6-Checkpoint Rubric
-
-The evaluator strictly enforces 6 checkpoints. There is **no partial credit**. If even one checkpoint fails, the lesson is rejected and passed back to the generator.
-
-1. `accurate_grounded` (LLM-judged against reference facts)
-2. `beginner_language` (Merged: Flesch Reading Ease programmatic gate **AND** LLM pedagogical judgment)
-3. `teaches_by_example` (LLM-judged)
-4. `no_unexplained_jargon` (Merged: Sentence-local Regex programmatic gate **AND** LLM judgment)
-5. `covers_key_points` (LLM-judged)
-6. `coherent_flow` (LLM-judged)
-
-## 🔄 Self-Evolution & Memory
-
-This system demonstrates two distinct learning loops:
-
-1. **In-Run Regeneration (Retry)**: If the lesson fails, the exact failure reasons are injected into the generator's next prompt. Maximum 2 retries (3 total attempts) to prevent infinite loops.
-2. **Controlled Failure-Pattern Learning (Memory)**: Uses SQLite to track recurring checkpoint failures across *distinct runs*. When a failure category crosses the configured threshold, a reviewed guidance rule for that category is added to future generation prompts to prevent the failure proactively.
-
-## 🚀 Setup & Run Instructions
-
-### 1. Environment Setup
-```bash
-python -m venv .venv
-# Windows
-.\.venv\Scripts\Activate.ps1
-# Mac/Linux
-source .venv/bin/activate
-
-pip install -r requirements.txt
+```text
+       Topic
+         |
+         v
+  Generate Lesson
+         |
+         v
+  Evaluate Lesson
+         |
+         +----------------------+
+         |                      |
+       PASS                   FAIL
+         |                      |
+         v                      v
+     Finalize            Record Failure
+                                |
+                                v
+                        Feed Feedback Back
+                                |
+                                v
+                         Generate Again
 ```
 
-### 2. Configuration
-Create a `.env` file in the root directory:
-```env
-GOOGLE_API_KEY=your_gemini_api_key_here
-```
+The system allows a maximum of two retries, which means a maximum of three total generation attempts.
 
-### 3. Run the Tests
-The test suite uses mocked model responses and does not make real LLM API calls. Full test execution requires installing the pinned project dependencies.
+A lesson is finalized only when the quality checks pass. If the retry limit is reached without a passing result, the system terminates without falsely approving the lesson.
+
+## Target Learner
+
+The lesson is designed for a:
+- 12th-grade graduate from India
+- Limited English vocabulary
+- Non-English-medium background
+- No prior knowledge of RAG
+
+The content starts from basic concepts and introduces technical terminology with beginner-friendly explanations.
+
+## Evaluation Rubric
+
+The evaluator uses six hard pass/fail checkpoints with no partial credit.
+
+1. **Accurate and Grounded**
+   Checks whether the generated lesson is factually correct and consistent with the trusted RAG reference material. The evaluation also guards against unsupported and misleading claims.
+2. **Beginner Language**
+   Checks whether the lesson is appropriate for the target learner. The checkpoint combines programmatic readability validation with LLM-based pedagogical evaluation. The configured readability threshold is a Flesch Reading Ease score of at least 60.
+3. **Teaches by Example**
+   Checks whether the lesson contains a meaningful example or analogy that helps the learner understand the concept.
+4. **No Unexplained Jargon**
+   Technical terms are allowed when they are necessary and explained appropriately. Unexplained technical terminology is treated as a failure. The checkpoint combines deterministic term-specific validation with LLM-based evaluation.
+5. **Covers Key Points**
+   The lesson must explain:
+   - What RAG is
+   - Why RAG matters
+   - How RAG works
+6. **Coherent Teaching Flow**
+   Checks whether the lesson follows a logical sequence that a beginner can understand.
+
+## Generation and Regeneration
+
+The generator creates the initial lesson from the topic and learner profile. The evaluator then checks the lesson against all six quality checkpoints.
+
+When a checkpoint fails, the actual failure information is passed to the next generation attempt. 
+
+**Examples include:**
+- *Readability failure* → Simplify sentence structure
+- *Jargon failure* → Explain the missing technical term
+- *Coverage failure* → Add the missing concept
+
+The regeneration step uses the actual evaluation feedback rather than a generic retry message.
+
+## Rejection Log
+
+Failed attempts are recorded in: `output/rejection_log.json`
+
+The rejection log records information such as: run, attempt, failed checkpoint, reason, retry instruction, and next attempt result. This provides a trace of what failed and how the next attempt was instructed to improve.
+
+## Final Output
+
+The final lesson is written to: `output/lesson_output.md`
+
+When the lesson passes the quality bar, this file contains the accepted lesson. If the retry limit is reached without a passing result, the system does not falsely mark the output as approved.
+
+## Memory and Self-Evolution
+
+The system uses SQLite for persistent failure memory. Failure information is stored across independent runs so recurring problems can be identified over time.
+
+Memory and self-evolution are treated separately:
+- **Memory** provides persistence across runs and allows previous failure information to be retrieved later.
+- **Self-evolution** uses repeated failure evidence to derive learned guidance that can influence later generation behavior. Learned guidance retains provenance so the historical failures that contributed to the learning can be traced.
+
+## Architecture
+
+The main workflow is implemented with **LangGraph**. The project combines deterministic validation with LLM-based evaluation, utilizes SQLite for persistent failure history and learned guidance, and relies on a curated RAG reference to support factual evaluation.
+
+### Why LangGraph
+LangGraph is used because the workflow contains state, conditional routing, retries, and a generation-evaluation loop. It makes the workflow transitions explicit and keeps regeneration bounded.
+
+### Why SQLite
+The memory requirements are primarily structured failure history and learned guidance. SQLite is sufficient for this scope and keeps the implementation simple. A vector database is not required for the assessment.
+
+### Reference Material
+The repository contains a RAG-specific factual reference which supports evaluation and grounding. It is not used as a replacement for lesson generation.
+
+### Model Configuration
+Generator and evaluator models are configured through the project configuration and environment variables. The runtime model may differ from the default configuration when an environment override is used. The repository keeps the model configuration explicit so the runtime behavior can be reproduced.
+
+## Repository Structure
+
+```text
+.
+├── main.py
+├── config.py
+├── graph/
+├── evaluation/
+├── memory/
+├── references/
+├── tests/
+├── output/
+│   └── lesson_output.md
+├── README.md
+├── requirements.txt
+├── .env.example
+└── .gitignore
+```
+*(Additional configuration files may be present when required by the application.)*
+
+## Setup
+
+1. **Create a virtual environment:**
+   ```bash
+   python -m venv .venv
+   
+   # Windows PowerShell
+   .\.venv\Scripts\Activate.ps1
+   
+   # macOS or Linux
+   source .venv/bin/activate
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configuration:**
+   Create a `.env` file in the project root (use `.env.example` as the template):
+   ```env
+   GOOGLE_API_KEY=your_gemini_api_key_here
+   ```
+   *Do not commit `.env`.*
+
+## Run Tests
+
+Run the test suite with:
 ```bash
 pytest -q
 ```
+*The standard test suite is designed to avoid unintended live LLM calls unless live integration testing is explicitly enabled by the project configuration.*
 
-### 4. Generate a Lesson (Standard Run)
+## Generate the Assessment Lesson
+
+Run:
 ```bash
 python main.py --topic "Introduction to RAG"
 ```
-**Output:**
-- `output/lesson_output.md`: The final approved lesson when the quality bar is passed. If all retries fail, it contains the last attempt clearly marked as an unapproved diagnostic draft.
-- `output/rejection_log.json`: The history of any failures and the instructions given to the generator to fix them.
 
-### 5. Deliberate Error Demo
-To demonstrate the evaluator catching a mistake, run:
+- **Final lesson is written to:** `output/lesson_output.md`
+- **Failure history is written to:** `output/rejection_log.json`
+
+## Deliberate Error Test
+
+The repository includes a controlled error mode for testing the evaluator and regeneration flow. 
+
+Verify the current command in the repository before use. The supported command is:
 ```bash
 python main.py --topic "Introduction to RAG" --inject-error jargon
 ```
-This intentionally strips the definition of "embedding" from the first draft, creating a deterministic violation that the `no_unexplained_jargon` checkpoint is designed to catch. You will watch the system catch the error, log the failure, and regenerate a passing lesson.
+
+**The expected behavior is:**
+Intentional Error → Evaluator Detects Failure → Failure Logged → Feedback Passed to Generator → Regeneration → Final Evaluation
+
+## Final Assessment Behavior
+
+For the assessment topic, the generated lesson must teach:
+- What RAG is
+- Why RAG matters
+- How RAG works
+
+The lesson must be understandable to a learner starting from zero and must pass all six evaluation checkpoints before it is accepted.
+
+## Project Goals
+
+The implementation is designed around five core behaviors:
+1. Generate useful beginner content.
+2. Evaluate the generated content against strict quality checks.
+3. Regenerate when the quality bar is not met.
+4. Record failure history and rejection reasons.
+5. Learn from recurring failures across independent runs.
+
+## Security
+
+API credentials are provided through environment variables. The repository does not require hard-coded API keys. Local `.env` files should never be committed.
+
+## License
+
+This repository was created as part of the NxtWave GenAI Engineer take-home assessment.

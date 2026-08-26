@@ -28,3 +28,7 @@ output/*
 Thumbs.db
 .idea/
 .vscode/
+
+# Local Only (not for GitHub)
+LOOM_RECORDING_SCRIPT.md
+LOOM_CHEAT_SHEET.md

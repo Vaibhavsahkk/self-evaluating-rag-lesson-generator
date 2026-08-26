@@ -20,6 +20,8 @@ CANONICAL_TECHNICAL_TERMS: list[str] = [
     "context window",
     "hallucination",
     "knowledge base",
+    "hyper-dimensional manifold",
+    "non-Euclidean",
 ]
 
 # Patterns for a follow-up definition sentence (e.g. "It is...", "This means...")
@@ -80,18 +82,16 @@ def check_jargon_heuristically(text: str) -> JargonCheckResult:
                 # Check current sentence for specific term definition
                 if any(re.search(pat, sentence, re.IGNORECASE) for pat in term_def_patterns):
                     has_def = True
-                    break
+                else:
+                    # Check next sentence
+                    if idx + 1 < len(sentences):
+                        next_sentence = sentences[idx + 1]
+                        has_followup = any(re.search(pat, next_sentence, re.IGNORECASE) for pat in FOLLOWUP_DEF_PATTERNS)
+                        has_term_and_def = term_pattern.search(next_sentence) and any(re.search(pat, next_sentence, re.IGNORECASE) for pat in term_def_patterns)
+                        
+                        if has_followup or has_term_and_def:
+                            has_def = True
                 
-                # Check next sentence
-                if idx + 1 < len(sentences):
-                    next_sentence = sentences[idx + 1]
-                    has_followup = any(re.search(pat, next_sentence, re.IGNORECASE) for pat in FOLLOWUP_DEF_PATTERNS)
-                    has_term_and_def = term_pattern.search(next_sentence) and any(re.search(pat, next_sentence, re.IGNORECASE) for pat in term_def_patterns)
-                    
-                    if has_followup or has_term_and_def:
-                        has_def = True
-                        break
-
         if not has_def and term_pattern.search(text):
             missing.append(term)
 

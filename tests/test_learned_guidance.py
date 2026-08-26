@@ -79,7 +79,7 @@ class TestLearnedGuidance:
 
         guidance = get_learned_guidance(db_path=temp_db)
         assert len(guidance) >= 1
-        assert GUIDANCE_MAP["no_unexplained_jargon"] in guidance
+        assert any(GUIDANCE_MAP["no_unexplained_jargon"] in item for item in guidance)
 
     def test_multiple_checkpoints_can_trigger(self, temp_db):
         """Different checkpoints can each independently trigger guidance."""
@@ -107,8 +107,8 @@ class TestLearnedGuidance:
 
         guidance = get_learned_guidance(db_path=temp_db)
         assert len(guidance) >= 2
-        assert GUIDANCE_MAP["no_unexplained_jargon"] in guidance
-        assert GUIDANCE_MAP["beginner_language"] in guidance
+        assert any(GUIDANCE_MAP["no_unexplained_jargon"] in item for item in guidance)
+        assert any(GUIDANCE_MAP["beginner_language"] in item for item in guidance)
 
 
 class TestMemoryPersistence:

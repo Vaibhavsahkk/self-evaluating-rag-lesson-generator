@@ -89,7 +89,7 @@ def generate_lesson(state: dict) -> dict:
         print("[GENERATE] ⚠️ Creating a deterministic jargon violation for demo mode...")
         # Prepending guarantees these terms appear first without definition, reliably triggering both heuristic and LLM checks.
         lesson = (
-            "Note: The context window and embedding process utilize orthogonal vector spaces for semantic similarity.\n\n"
+            "Note: The hyper-dimensional manifold computes cosine distance across un-normalized non-Euclidean vector spaces. Advanced mathematics are required to understand this.\n\n"
             + lesson
         )
 

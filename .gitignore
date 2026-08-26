@@ -1,0 +1,30 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Pytest cache
+.pytest_cache/
+
+# Environments
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# Data and Databases
+data/*.db
+data/learning_store.db
+
+# Output artifacts
+output/*
+!output/.gitkeep
+!output/lesson_output.md
+!output/rejection_log.json
+
+# IDE / OS junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

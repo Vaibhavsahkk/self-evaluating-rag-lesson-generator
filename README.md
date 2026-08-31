@@ -120,6 +120,31 @@ Generator and evaluator models are configured through `config.py` defaults and c
 ### Final Lesson Document
 `FINAL_INTRODUCTION_TO_RAG_LESSON.docx` is the formatted document version of the accepted lesson (the same content as `output/lesson_output.md` from the passing run), including the two infographics in `assets/`. It is regenerated with `python assets/create_docx.py` and is the file to upload as the submission "Document link" (Google Doc / Notion).
 
+## Web Console (optional)
+
+The repository also ships a browser console (`ui/`) so anyone can run the pipeline without touching the CLI. It streams the generate → evaluate → regenerate loop live over Server-Sent Events.
+
+1. **Install the extra server dependencies** (included in `requirements.txt`):
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Start the server** from the project root:
+   ```bash
+   python -m uvicorn ui.server:app --host 127.0.0.1 --port 8077
+   ```
+
+3. **Open** [http://127.0.0.1:8077](http://127.0.0.1:8077) in a browser.
+
+The console offers four views:
+
+* **Pipeline Run** — enter a topic, optionally enable *Demo mode* (the deliberate jargon flaw for the evaluator to catch), and watch each attempt, the six checkpoints, and the retry feedback appear live.
+* **Final Lesson** — the accepted lesson rendered as a document, with copy and download actions.
+* **Rejection Trace** — what failed, why, what the generator was told to change, and whether the fix worked.
+* **Learning Memory** — the learned rules derived from cross-run failure history.
+
+REST API (same server): `GET /api/run` (SSE), `/api/lesson`, `/api/rejection_log`, `/api/memory`, `/api/config`, `/api/health`. Interactive docs at `/api/docs`.
+
 ## Repository Structure
 
 ```text
@@ -131,6 +156,11 @@ Generator and evaluator models are configured through `config.py` defaults and c
 ├── memory/
 ├── references/
 ├── tests/
+├── ui/
+│   ├── server.py        # FastAPI + SSE server
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
 ├── assets/
 │   ├── create_docx.py
 │   ├── infographic1_rag_flow.png

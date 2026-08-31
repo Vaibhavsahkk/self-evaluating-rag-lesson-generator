@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesson Forge — Self-Evaluating Content Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grain"></div>
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-mark">LF</div>
+    <div class="brand-text">
+      <div class="brand-name">Lesson Forge</div>
+      <div class="brand-sub">Content quality console</div>
+    </div>
+  </div>
+
+  <nav class="nav">
+    <button class="nav-item active" data-view="run">
+      <span class="nav-ico">◉</span> Pipeline Run
+    </button>
+    <button class="nav-item" data-view="lesson">
+      <span class="nav-ico">◧</span> Final Lesson
+    </button>
+    <button class="nav-item" data-view="trace">
+      <span class="nav-ico">≡</span> Rejection Trace
+    </button>
+    <button class="nav-item" data-view="memory">
+      <span class="nav-ico">◇</span> Learning Memory
+    </button>
+  </nav>
+
+  <div class="sidebar-foot">
+    <div class="cfg" id="cfg-models">
+      <div class="cfg-row"><span>Generator</span><b id="cfg-gen">—</b></div>
+      <div class="cfg-row"><span>Evaluator</span><b id="cfg-eval">—</b></div>
+      <div class="cfg-row"><span>Retry limit</span><b id="cfg-retry">—</b></div>
+      <div class="cfg-row"><span>Flesch ≥</span><b id="cfg-flesch">—</b></div>
+    </div>
+    <div class="status-pill" id="api-status"><span class="dot"></span> connecting…</div>
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- ───────── RUN VIEW ───────── -->
+  <section class="view active" id="view-run">
+    <header class="view-head">
+      <div>
+        <h1>Generate a lesson that <em>proves</em> itself</h1>
+        <p class="lede">One topic in. Six hard checkpoints out. The pipeline judges its own output and only ships what passes.</p>
+      </div>
+    </header>
+
+    <div class="run-grid">
+      <div class="panel panel-run">
+        <div class="panel-head">
+          <h2>New Run</h2>
+          <span class="tag" id="run-state-tag">idle</span>
+        </div>
+
+        <label class="field-label" for="topic-input">Topic</label>
+        <div class="topic-wrap">
+          <input id="topic-input" type="text" value="Introduction to RAG" spellcheck="false"
+                 placeholder="e.g. Introduction to RAG">
+          <button class="btn-run" id="btn-run">
+            <span class="btn-label">Run pipeline</span>
+          </button>
+        </div>
+
+        <label class="toggle-row">
+          <input type="checkbox" id="chk-error">
+          <span class="toggle-track"></span>
+          <span class="toggle-text">
+            <b>Demo mode</b> — inject a deliberate jargon flaw so you can watch the evaluator catch it and regenerate
+          </span>
+        </label>
+
+        <div class="run-meta" id="run-meta">
+          <span id="meta-runid">run id —</span>
+          <span id="meta-topic"></span>
+        </div>
+      </div>
+
+      <div class="panel panel-status">
+        <div class="panel-head"><h2>Live Status</h2></div>
+        <div class="big-status" id="big-status">
+          <span class="big-dot" id="big-dot"></span>
+          <span id="big-label">Waiting to start</span>
+        </div>
+
+        <div class="attempt-track" id="attempt-track">
+          <div class="attempt-cell" data-n="1">
+            <div class="attempt-bar"><div class="attempt-fill"></div></div>
+            <span>Attempt 1</span>
+          </div>
+          <div class="attempt-connector"></div>
+          <div class="attempt-cell" data-n="2">
+            <div class="attempt-bar"><div class="attempt-fill"></div></div>
+            <span>Attempt 2</span>
+          </div>
+          <div class="attempt-connector"></div>
+          <div class="attempt-cell" data-n="3">
+            <div class="attempt-bar"><div class="attempt-fill"></div></div>
+            <span>Attempt 3</span>
+          </div>
+        </div>
+
+        <div class="cp-grid" id="cp-grid">
+          <div class="cp" data-cp="accurate_grounded"><span class="cp-name">Accurate &amp; Grounded</span><span class="cp-dot"></span></div>
+          <div class="cp" data-cp="beginner_language"><span class="cp-name">Beginner Language</span><span class="cp-dot"></span></div>
+          <div class="cp" data-cp="teaches_by_example"><span class="cp-name">Teaches by Example</span><span class="cp-dot"></span></div>
+          <div class="cp" data-cp="no_unexplained_jargon"><span class="cp-name">No Unexplained Jargon</span><span class="cp-dot"></span></div>
+          <div class="cp" data-cp="covers_key_points"><span class="cp-name">Covers Key Points</span><span class="cp-dot"></span></div>
+          <div class="cp" data-cp="coherent_flow"><span class="cp-name">Coherent Flow</span><span class="cp-dot"></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel log-panel">
+      <div class="panel-head">
+        <h2>Pipeline Log</h2>
+        <div class="log-legend">
+          <span><i class="lg lg-info"></i>info</span>
+          <span><i class="lg lg-fail"></i>fail</span>
+          <span><i class="lg lg-pass"></i>pass</span>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+
+  <!-- ───────── LESSON VIEW ───────── -->
+  <section class="view" id="view-lesson">
+    <header class="view-head row">
+      <div>
+        <h1>Final lesson</h1>
+        <p class="lede" id="lesson-meta">The accepted lesson from the last passing run.</p>
+      </div>
+      <div class="head-actions">
+        <button class="btn-ghost" id="btn-reload-lesson">Refresh</button>
+        <button class="btn-ghost" id="btn-copy-lesson">Copy</button>
+        <button class="btn-solid" id="btn-dl-md">Download .md</button>
+      </div>
+    </header>
+    <div class="panel">
+      <article class="lesson" id="lesson-body">
+        <p class="empty">Run the pipeline first — the accepted lesson will appear here.</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- ───────── TRACE VIEW ───────── -->
+  <section class="view" id="view-trace">
+    <header class="view-head">
+      <h1>Rejection trace</h1>
+      <p class="lede">What failed, why it failed, what the system told the generator to change, and whether the fix worked.</p>
+    </header>
+    <div class="trace-list" id="trace-list">
+      <p class="empty">No failures recorded in the last run.</p>
+    </div>
+  </section>
+
+  <!-- ───────── MEMORY VIEW ───────── -->
+  <section class="view" id="view-memory">
+    <header class="view-head">
+      <h1>Learning memory</h1>
+      <p class="lede">Rules the system derived from repeated failures across past runs. They are injected into every new generation as standing guidance.</p>
+    </header>
+    <div class="mem-grid" id="mem-grid"></div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

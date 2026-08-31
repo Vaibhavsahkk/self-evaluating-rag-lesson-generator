@@ -115,7 +115,10 @@ The memory requirements are primarily structured failure history and learned gui
 The repository contains a RAG-specific factual reference which supports evaluation and grounding. It is not used as a replacement for lesson generation.
 
 ### Model Configuration
-Generator and evaluator models are configured through the project configuration and environment variables. The runtime model may differ from the default configuration when an environment override is used. The repository keeps the model configuration explicit so the runtime behavior can be reproduced.
+Generator and evaluator models are configured through `config.py` defaults and can be overridden with the `GENERATOR_MODEL` and `EVALUATOR_MODEL` environment variables. The runtime model is whatever `.env` (or the environment) provides, so the repository keeps model configuration explicit and reproducible.
+
+### Final Lesson Document
+`FINAL_INTRODUCTION_TO_RAG_LESSON.docx` is the formatted document version of the accepted lesson (the same content as `output/lesson_output.md` from the passing run), including the two infographics in `assets/`. It is regenerated with `python assets/create_docx.py` and is the file to upload as the submission "Document link" (Google Doc / Notion).
 
 ## Repository Structure
 
@@ -128,6 +131,10 @@ Generator and evaluator models are configured through the project configuration 
 ├── memory/
 ├── references/
 ├── tests/
+├── assets/
+│   ├── create_docx.py
+│   ├── infographic1_rag_flow.png
+│   └── infographic2_comparison.png
 ├── output/
 │   └── lesson_output.md
 ├── README.md
@@ -135,7 +142,6 @@ Generator and evaluator models are configured through the project configuration 
 ├── .env.example
 └── .gitignore
 ```
-*(Additional configuration files may be present when required by the application.)*
 
 ## Setup
 
@@ -163,12 +169,15 @@ Generator and evaluator models are configured through the project configuration 
    *Do not commit `.env`.*
 
 ## Run Tests
-
-Run the test suite with:
 ```bash
 pytest -q
 ```
-*The standard test suite is designed to avoid unintended live LLM calls unless live integration testing is explicitly enabled by the project configuration.*
+The standard suite (78 tests) runs fully offline — all LLM calls are mocked.
+
+Live evaluator regression tests (3) call the real evaluator model and are skipped by default. Enable them explicitly:
+```bash
+RUN_LIVE_LLM_TESTS=1 pytest -q -m live
+```
 
 ## Generate the Assessment Lesson
 

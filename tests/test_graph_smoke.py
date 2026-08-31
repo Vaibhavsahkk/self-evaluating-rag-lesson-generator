@@ -7,9 +7,28 @@ and state transitions together without relying on the actual Gemini API.
 
 from unittest.mock import patch
 import sqlite3
+
+import pytest
+
 from config import DB_PATH
 from graph.graph import build_graph
 from evaluation.rubric import LLMEvaluationResponse, LLMCheckpointResult
+
+
+@pytest.fixture()
+def isolated_output_paths(tmp_path):
+    """
+    Redirect finalize's output writes to a temp directory.
+
+    Without this, graph smoke tests overwrite the real
+    output/lesson_output.md and output/rejection_log.json artifacts.
+    """
+    lesson_path = str(tmp_path / "lesson_output.md")
+    rejection_path = str(tmp_path / "rejection_log.json")
+    with patch("graph.nodes.LESSON_OUTPUT_PATH", lesson_path), \
+         patch("graph.nodes.REJECTION_LOG_PATH", rejection_path), \
+         patch("graph.nodes.OUTPUT_DIR", str(tmp_path)):
+        yield lesson_path, rejection_path
 
 
 # We patch ChatGoogleGenerativeAI to prevent Pydantic from trying to validate
@@ -18,7 +37,7 @@ from evaluation.rubric import LLMEvaluationResponse, LLMCheckpointResult
 @patch("evaluation.checkpoints.ChatGoogleGenerativeAI")
 @patch("graph.nodes._invoke_with_retry")
 @patch("evaluation.checkpoints._call_evaluator_model")
-def test_successful_path_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, mock_llm_gen, tmp_path):
+def test_successful_path_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, mock_llm_gen, tmp_path, isolated_output_paths):
     """Test the graph routes correctly when the evaluator immediately passes."""
     mock_generator.return_value = "This is a simple fake lesson."
     
@@ -56,7 +75,7 @@ def test_successful_path_graph_smoke(mock_evaluator, mock_generator, mock_llm_ev
 @patch("evaluation.checkpoints.ChatGoogleGenerativeAI")
 @patch("graph.nodes._invoke_with_retry")
 @patch("evaluation.checkpoints._call_evaluator_model")
-def test_retry_path_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, mock_llm_gen, tmp_path):
+def test_retry_path_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, mock_llm_gen, tmp_path, isolated_output_paths):
     """Test the graph routes back to generation on failure, then passes."""
     mock_generator.return_value = "This is a simple fake lesson."
 
@@ -107,7 +126,7 @@ def test_retry_path_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, m
 @patch("evaluation.checkpoints.ChatGoogleGenerativeAI")
 @patch("graph.nodes._invoke_with_retry")
 @patch("evaluation.checkpoints._call_evaluator_model")
-def test_retry_exhaustion_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, mock_llm_gen, tmp_path):
+def test_retry_exhaustion_graph_smoke(mock_evaluator, mock_generator, mock_llm_eval, mock_llm_gen, tmp_path, isolated_output_paths):
     """Test the graph exits with failed_quality_bar after max retries."""
     mock_generator.return_value = "This is a simple fake lesson."
 

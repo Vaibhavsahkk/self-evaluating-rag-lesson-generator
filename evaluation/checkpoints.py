@@ -6,8 +6,6 @@ Enforces:
 2. Deterministic heuristic jargon gate + LLM check for no_unexplained_jargon.
 3. Strict Pydantic validation (exactly 6 unique checkpoints).
 4. Python-computed overall_pass.
-
-4. Python-computed overall_pass.
 """
 
 import json

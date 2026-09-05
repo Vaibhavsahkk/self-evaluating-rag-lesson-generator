@@ -9,14 +9,15 @@ import json
 import os
 import sys
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import (
@@ -29,6 +30,8 @@ from config import (
     READABILITY_FLESCH_MIN,
     LEARNED_GUIDANCE_THRESHOLD,
     LEARNER_PROFILE,
+    MAX_TOPIC_LENGTH,
+    PUBLIC_RUNS_PER_HOUR,
 )
 from graph.graph import build_graph
 from memory.learning_store import generate_run_id
@@ -45,6 +48,44 @@ CHECKPOINT_LABELS = {
     "covers_key_points": "Covers Key Points",
     "coherent_flow": "Coherent Flow",
 }
+
+
+class PublicRunLimiter:
+    """Bound anonymous demo usage for a single-process deployment."""
+
+    def __init__(self, runs_per_hour: int):
+        self.runs_per_hour = max(1, runs_per_hour)
+        self._attempts: dict[str, list[float]] = {}
+        self._active: set[str] = set()
+        self._lock = threading.Lock()
+
+    def acquire(self, client_id: str) -> bool:
+        now = time.monotonic()
+        cutoff = now - 3600
+        with self._lock:
+            attempts = [stamp for stamp in self._attempts.get(client_id, []) if stamp > cutoff]
+            if client_id in self._active or len(attempts) >= self.runs_per_hour:
+                self._attempts[client_id] = attempts
+                return False
+            self._attempts[client_id] = [*attempts, now]
+            self._active.add(client_id)
+            return True
+
+    def release(self, client_id: str) -> None:
+        with self._lock:
+            self._active.discard(client_id)
+
+
+run_limiter = PublicRunLimiter(PUBLIC_RUNS_PER_HOUR)
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 def _checkpoint_payload(state: dict) -> list[dict] | None:
@@ -171,15 +212,10 @@ def _stream_graph(topic: str, inject_error: str | None):
         raise
 
 
-async def _sse_response(topic: str, inject_error: str | None):
-    def iterate():
-        for line in _stream_graph(topic, inject_error):
-            yield line
-
+async def _sse_response(topic: str, inject_error: str | None, client_id: str):
     async def stream():
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue = asyncio.Queue()
-        finished = threading.Event()
 
         def produce():
             try:
@@ -190,20 +226,47 @@ async def _sse_response(topic: str, inject_error: str | None):
 
         threading.Thread(target=produce, daemon=True).start()
 
-        while True:
-            item = await queue.get()
-            if item is None:
-                break
-            yield item
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield item
+        finally:
+            run_limiter.release(client_id)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
 
 @app.get("/api/run")
-async def api_run(topic: str = "Introduction to RAG", inject_error: str | None = None):
+async def api_run(
+    request: Request,
+    topic: str = "Introduction to RAG",
+    inject_error: str | None = None,
+):
     """Stream a full pipeline run live over SSE."""
     topic = (topic or "Introduction to RAG").strip()
-    return await _sse_response(topic, inject_error or None)
+    if len(topic) > MAX_TOPIC_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Topic must be {MAX_TOPIC_LENGTH} characters or fewer.",
+        )
+    if inject_error not in (None, "", "jargon"):
+        raise HTTPException(status_code=400, detail="Unsupported demo mode.")
+
+    client_id = request.client.host if request.client else "unknown"
+    if not run_limiter.acquire(client_id):
+        return JSONResponse(
+            status_code=429,
+            content={
+                "detail": (
+                    "Public demo limit reached. Try again later; "
+                    f"maximum is {PUBLIC_RUNS_PER_HOUR} runs per hour per IP."
+                )
+            },
+            headers={"Retry-After": "3600"},
+        )
+    return await _sse_response(topic, inject_error or None, client_id)
 
 
 @app.get("/api/lesson")
@@ -239,6 +302,8 @@ async def api_config():
         "max_retries": MAX_RETRIES,
         "flesch_min": READABILITY_FLESCH_MIN,
         "guidance_threshold": LEARNED_GUIDANCE_THRESHOLD,
+        "public_runs_per_hour": PUBLIC_RUNS_PER_HOUR,
+        "max_topic_length": MAX_TOPIC_LENGTH,
     }
 
 

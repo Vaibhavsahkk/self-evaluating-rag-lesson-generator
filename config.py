@@ -29,6 +29,10 @@ MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))
 API_RETRY_ATTEMPTS = 2          # infrastructure retry on network/rate-limit errors
 API_RETRY_BACKOFF_BASE = 2      # seconds — exponential backoff base
 
+# --- Public demo protection ---
+PUBLIC_RUNS_PER_HOUR = int(os.getenv("PUBLIC_RUNS_PER_HOUR", "3"))
+MAX_TOPIC_LENGTH = int(os.getenv("MAX_TOPIC_LENGTH", "200"))
+
 # --- Readability Thresholds ---
 READABILITY_FLESCH_MIN = 60
 READABILITY_AVG_SENTENCE_MAX = 20

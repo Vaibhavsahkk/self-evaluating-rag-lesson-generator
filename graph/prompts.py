@@ -28,7 +28,12 @@ Generation rules:
 
 1. Use simple, clear English appropriate for the learner profile.
    Prefer short sentences, avoid nested clauses, and keep most sentences
-   below 20 words.
+   below 20 words. Target a Flesch Reading Ease score of 65 or higher —
+   write comfortably ABOVE the 60 minimum, not at the edge. Practical
+   habits that raise the score: use common everyday words instead of
+   long formal ones (get instead of obtain, help instead of assist,
+   find instead of identify), keep sentences in the 8-15 word range,
+   and break any sentence that runs past 20 words into two.
 
 2. Define every technical term that a beginner may not know in plain
    language at or before its first meaningful use.

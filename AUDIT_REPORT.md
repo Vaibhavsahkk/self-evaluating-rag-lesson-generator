@@ -1,80 +1,53 @@
 # Deep Audit Report — Self-Evaluating Lesson Content Generator
 
-Audit date: 2026-09-01 · Auditor: independent line-by-line review of every module, test, artifact, and the git history, plus fresh live runs against the Gemini API.
+Audit 1: 2026-09-01 — initial submission audit (live runs, artifact verification)
+Audit 2: 2026-09-05 — fix round after live-run failures; all fixes verified with fresh live runs
 
 ---
 
-## 1. Verdict
+## Audit 2 verdict
 
-**The system genuinely implements the full assessment loop, and after this audit round it is submission-ready on the technical side.** Before this round, the repo had one critical defect: the committed "final" artifacts were a mocked test run's leftovers. That is now fixed and verified with live runs.
+**The system now works end-to-end in live runs.** Audit 2 began after 4 consecutive live runs failed the quality bar. Root causes were found, fixed, covered by regression tests, and verified with fresh live runs — including a passing normal run, a passing demo-recovery run, and a passing SSE run through the web console.
 
----
+## Defects found in Audit 2 and their fixes
 
-## 2. Requirement-by-requirement status
-
-| # | Assessment requirement | Status | Evidence |
+| # | Defect (verified live) | Root cause | Fix |
 |---|---|---|---|
-| 1 | INPUT: topic, learner from zero | ✅ Done | `main.py --topic`, `LEARNER_PROFILE` fixed from the brief in `config.py:42` |
-| 2 | GENERATE: standalone beginner lesson (what/why/how) | ✅ Done | `graph/prompts.py` — 14-rule generator system prompt, teaching structure enforced; live run passed coverage on attempt 1 |
-| 3 | EVALUATE: hard pass/fail rubric, no partial credit | ✅ Done | 6 checkpoints, `EvaluationResult.overall_pass = all(...)` computed in Python (`evaluation/checkpoints.py:99`), Pydantic `Literal` enforces exactly 6 names (`evaluation/rubric.py`) |
-| 4 | Rubric dimensions covered (accuracy, beginner language, example, jargon, key points, flow) | ✅ Done | All six from the brief, each mapped 1:1 to a checkpoint |
-| 5 | REGENERATE: feedback fed back, max 1–2 retries, always terminates | ✅ Done | `MAX_RETRIES=2` → 3 bounded attempts; `route_after_failure` guarantees termination; retry instructions are specific failure reasons, not generic |
-| 6 | OUTPUT: passing lesson + rejection log | ✅ Done | `output/lesson_output.md` (accepted, Flesch 63.8) + `output/rejection_log.json` with failed-checkpoint → why → retry-instruction → next-attempt-result trace |
-| 7 | SELF-EVOLVING: learn from repeated failures | ✅ Done | SQLite store; guidance fires after 3 distinct-run failures; LLM-derived rules cached with provenance (`memory/learning_store.py`) |
-| 8 | MEMORY: persists across runs | ✅ Done | 30 runs, 3 learned rules currently active in `data/learning_store.db` |
-| 9 | STACK: n8n/LangGraph/LangChain/Python+API, any model | ✅ Done | Python + LangGraph + Gemini via `langchain-google-genai` |
-| 10 | Deliberate error caught on video | ✅ Done | `--inject-error jargon` prepends a deterministic jargon paragraph; live run: failed jargon → failed again → passed on attempt 3 with full correction trace |
-| 11 | Tests | ✅ Done | 78 offline tests, all pass (3× repeat runs stable); 3 live evaluator tests pass against real API |
-| 12 | GitHub repo + README | ✅ Done | Pushed: `Vaibhavsahkk/self-evaluating-rag-lesson-generator`, README has setup/run/test instructions |
-| 13 | Document link (Google Doc/Notion) | 🔶 Local file ready | `FINAL_INTRODUCTION_TO_RAG_LESSON.docx` regenerated from the accepted lesson + infographics; **user must upload** and get share link |
-| 14 | Loom video 15–20 min | ❌ User action | Script + cheat sheet restored locally (`LOOM_RECORDING_SCRIPT.md`, `LOOM_CHEAT_SHEET.md`, git-ignored) — recording pending |
+| 1 | Live runs failed `no_unexplained_jargon` on defined terms (`retrieval`, `vector`, `LLM`) | Heuristic regexes did not recognize Markdown definition styles: bold-colon bullets (`* **Term**: def`), and flagged terms inside compounds (`retrieval` in "Retrieval-Augmented Generation", `vector` in "vector database") | Line-aware rework of `evaluation/jargon.py`: colon-definition pattern, compound-exclusion, bridge-word parentheticals; follow-up sentences must actually define, not merely comment |
+| 2 | Self-evolution memory poisoned itself: learned rules named demo terms ("hyper-dimensional manifold", "non-Euclidean") and injected them into every future generation | Demo-mode failures were written to the learning store like real failures; LLM-derived guidance absorbed the demo vocabulary | `write_memory_node` stores demo runs with `DEMO:` topic prefix; `get_learned_guidance` excludes them from the lookback window; existing DB purged (14 contaminated runs quarantined, poisoned rules deleted) |
+| 3 | Razor-thin Flesch margin (generator landing 57–59 vs 60 threshold); retries insufficiently actionable | No headroom target in prompt; retry instruction was vague ("simplify") | Generator prompt now targets Flesch 65+ with concrete habits; readability retry instruction carries the actual score and concrete rewrite tactics |
+| 4 | Demo-mode retry told generator to "define" the injected advanced-math terms instead of removing them | Retry instruction said "define at first use" unconditionally | Retry instruction now says remove-or-define, with advanced terms explicitly called out for removal |
+| 5 | UI web console could not start: `uvicorn`/`fastapi`/`python-docx` not installed in `.venv` (no pip in venv) | requirements listed but never installed into this venv | Installed via `uv pip install --python .venv/Scripts/python.exe`; server verified live |
+| 6 | `FINAL_INTRODUCTION_TO_RAG_LESSON.docx` did not match `output/lesson_output.md` (different lesson, different example college) despite README claiming identical content | DOCX was hand-built from an older generation | `assets/create_docx.py` rewritten to parse `lesson_output.md` directly, embeds both infographics, and **refuses to build from a diagnostic draft**; DOCX regenerated from the current accepted lesson |
+| 7 | UI Rejection Trace displayed wrong attempt numbers (both attempt-1 corrections shown as attempts 1 and 2) | On-disk log's `corrections[]` had no `attempt_number`; UI invented sequential numbers | `finalize` now writes `attempt_number` per correction; `app.js` uses the real field |
+| 8 | UI SSE `done` event could report empty lesson/rejections; attempt counts unreliable | `server.py` replaced accumulated state with each node's partial snapshot | Snapshots are merged (with append-reduction for `rejection_log`); attempt derived from merged state |
+| 9 | Nonexistent model names in defaults (`gemini-3.5-flash-lite`, `gemini-3.7-flash`) | Placeholder names | Defaults + `.env.example` now use `gemini-flash-lite-latest` / `gemini-flash-latest` |
+| 10 | Dead code and dead files: unused `RejectionLog` import, `references/react_hooks_facts.md`, `tests/fixtures/bad_lesson_example.md` | Leftovers | Removed from repo |
 
----
+## Verification performed in Audit 2 (all fresh, all live)
 
-## 3. Critical defect found and fixed in this audit
+1. **Offline suite**: `pytest -q` → **95 passed, 3 skipped** (78 original + 17 new regression tests for the fixes). Verified outputs not clobbered.
+2. **Live evaluator regression**: `RUN_LIVE_LLM_TESTS=1 pytest -m live` → **3/3 passed**.
+3. **Live normal run #1**: attempt 1 failed jargon (`LLM` undefined), attempt 2 failed readability (Flesch 59.0), attempt 3 **passed all 6** → `passed`, accepted lesson Flesch **71.8**.
+4. **Live demo run** (`--inject-error jargon`): attempt 1 failed (heuristic AND LLM both caught injected terms), attempt 2 **passed all 6** → recovery demonstrated in one retry; run stored as `DEMO:` and excluded from guidance.
+5. **Live normal run #2** (final canonical artifacts): attempt 1 failed jargon, attempt 2 **passed all 6** → committed `lesson_output.md` + `rejection_log.json` come from this run.
+6. **Web console live**: server started; `/api/health`, `/api/config`, `/api/lesson`, `/api/rejection_log`, `/api/memory` all verified; **SSE `/api/run` executed a full pipeline run that passed on attempt 1** with correct event stream (start → memory → generate → evaluate → done → lesson → rejections).
+7. **DOCX**: rebuilt from the accepted lesson; sentence-level content verified identical; both infographics embedded; draft-guard verified (refuses non-passing output).
 
-**Committed artifacts were fake (severity: submission-killing).** `tests/test_graph_smoke.py` ran the real `finalize` node against mocked LLMs without redirecting the output paths. The exhaustion test wrote `This is a simple fake lesson.` + a `failed_quality_bar` rejection log into the real `output/` files. So what was committed (and what the internal audit reports claimed was the passing lesson) was actually a mock's leftover.
+## Run history snapshot (data/learning_store.db, post-fix)
 
-Fix: a pytest fixture patches `graph.nodes.LESSON_OUTPUT_PATH` / `REJECTION_LOG_PATH` / `OUTPUT_DIR` to `tmp_path` for every graph smoke test. Verified by checksum: outputs identical across 3 consecutive pytest runs.
+- 45 runs recorded; 14 quarantined as `DEMO:`.
+- Post-fix live results: 4 consecutive passes (attempts: 1, 2, 3, 2) across normal, demo, and SSE runs.
 
-Other issues fixed:
-- Stale/duplicated internal audit reports and debug scripts (`dump*.py/txt`, `search_xml.py`, `~$...docx` Word lock file, `jargon_log.txt`, logs) removed from the repo.
-- `FINAL_INTRODUCTION_TO_RAG_LESSON.docx` was out of sync with the pipeline output (it came from a different generation than `lesson_output.md`). Rebuilt via `assets/create_docx.py` to mirror the accepted lesson; build script and infographics now live in `assets/`.
-- README updated: real repo tree, live-test instructions, docx provenance, honest model-configuration note.
+## Remaining user-side deliverables (unchanged)
 
----
+1. Record the 15–20 min Loom video (`LOOM_RECORDING_SCRIPT.md`, `LOOM_CHEAT_SHEET.md` — local only).
+2. Upload `FINAL_INTRODUCTION_TO_RAG_LESSON.docx` to Google Docs/Notion; make the link public.
+3. Submit the form: repo + document link + Loom link.
 
-## 4. Verification performed (fresh, this audit)
+## Design quality notes (unchanged from Audit 1)
 
-1. **Offline suite**: `pytest -q` → 78 passed, 3 skipped, 3 consecutive runs, artifacts unchanged (sha1 compared).
-2. **Live evaluator regression**: `RUN_LIVE_LLM_TESTS=1 pytest -m live` → 3/3 pass. The evaluator rejects absolute claims, invented facts, and "stops guessing" statements against fixtures.
-3. **Clean live run** (`python main.py --topic "Introduction to RAG"`): all 6 checkpoints passed on attempt 1, Flesch 63.8, avg sentence 12.8 words. Learned guidance from 3 historical checkpoint failures was loaded into the prompt — the self-evolution loop demonstrably improves first-attempt pass rate.
-4. **Demo live run** (`--inject-error jargon`): attempt 1 failed `no_unexplained_jargon`; attempt 2 failed jargon+grounding+readability; attempt 3 passed. Rejection log shows the full failed→why→instruction→resolved trace. Perfect Loom evidence.
-5. **Deterministic spot-check of the final lesson** independent of the pipeline: readability, jargon heuristic, absolute-claims grounding all pass.
-
----
-
-## 5. Design quality notes (what holds up)
-
-- **overall_pass is never an LLM output** — Python computes it; Pydantic validates the exact 6-checkpoint set. The judge cannot self-approve through free text.
-- **Deterministic + LLM hybrid evaluation**: readability (Flesch/avg-length/long-rate), jargon-definitions-near-first-use, and absolute-claim regexes are code; pedagogy, grounding, examples, coverage, flow are the LLM's judgment. Both sides must pass for the three hybrid checkpoints. Good defense against a lazy or sycophantic judge.
-- **Guidance derivation caching**: learned rules are re-derived only when the contributing run-set changes, with source run IDs stored — auditable evolution, not a black box.
-- **Honest failure mode**: when retries exhaust, output is a clearly-marked diagnostic draft, never falsely approved.
-
-## 6. Minor observations (not blocking; optional)
-
-- `.env` currently sets both models to `gemini-flash-lite-latest`; a stronger evaluator model (e.g. `gemini-flash-latest`) would make the judge more robust. Config supports it — one-line `.env` change, no code.
-- Generator is not grounded-in-reference at generation time (evaluator grounds post-hoc). Defensible trade-off — already documented in README; grounding the generator would risk verbatim copying from `rag_facts.md`.
-- `LEARNED_GUIDANCE_LOOKBACK_RUNS=20` is smaller than the current 33-run history, so older failures fall out of the derivation window; with only 3 rules cached this is fine.
-
----
-
-## 7. Remaining plan (only user-side deliverables)
-
-| Step | Action | Where |
-|---|---|---|
-| 1 | Record 15–20 min Loom using `LOOM_RECORDING_SCRIPT.md` + `LOOM_CHEAT_SHEET.md`. Show: clean run → inject-error run (evaluator catches, retries, passes) → memory/rejection-log walkthrough → face-visible architecture explanation. | Local |
-| 2 | Upload `FINAL_INTRODUCTION_TO_RAG_LESSON.docx` to Google Docs/Notion, make link public. | Local → web |
-| 3 | Submit the form: GitHub repo link + document link + Loom link. | https://forms.gle/a7MJUNoTxvSdRB8R6 |
-
-Everything else is done, pushed, and verified.
+- `overall_pass` is computed in Python, never an LLM output; Pydantic Literal enforces exactly 6 checkpoints.
+- Hybrid evaluation: deterministic readability + jargon + absolute-claim gates ANDed with LLM judgments — the judge cannot self-approve and cannot be sweet-talked.
+- Learned guidance derivation is cached with run-ID provenance; demo runs are structurally excluded from learning.
+- Honest failure mode: retry exhaustion writes a clearly-marked diagnostic draft; the DOCX builder refuses non-passing lessons.

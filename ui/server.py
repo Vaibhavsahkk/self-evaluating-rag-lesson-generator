@@ -104,14 +104,21 @@ def _stream_graph(topic: str, inject_error: str | None):
             for node_name, snapshot in chunk.items():
                 if not isinstance(snapshot, dict):
                     continue
-                last_state = snapshot
+                # Nodes emit partial updates — merge so final fields
+                # (current_lesson, final_status, rejection_log) survive.
+                # rejection_log is append-reduced in the graph, so extend
+                # rather than overwrite.
+                if "rejection_log" in snapshot:
+                    last_state["rejection_log"] = (last_state.get("rejection_log") or []) + snapshot["rejection_log"]
+                    snapshot = {k: v for k, v in snapshot.items() if k != "rejection_log"}
+                last_state.update(snapshot)
 
                 if node_name == "load_memory":
                     guidance = snapshot.get("learned_guidance", []) or []
                     yield sse({"type": "memory", "count": len(guidance), "rules": guidance})
 
                 elif node_name == "generate_lesson":
-                    attempt = snapshot.get("attempt_count", 0)
+                    attempt = last_state.get("attempt_count", 0)
                     # LangGraph streams the pre-update state; derive the true attempt number
                     if attempt == 0:
                         attempt = last_attempt + 1

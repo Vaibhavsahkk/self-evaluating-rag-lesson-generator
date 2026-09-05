@@ -1,19 +1,6 @@
 {
   "final_status": "passed",
-  "total_attempts": 2,
+  "total_attempts": 1,
   "max_retries_configured": 2,
-  "corrections": [
-    {
-      "failed_checkpoint": "beginner_language",
-      "why": "Pedagogical check OK, but readability gate failed: Readability too complex: Flesch=58.3 (need \u226560).",
-      "retry_instruction": "Generator was instructed to apply retry instruction: Simplify sentence structures: Readability too complex: Flesch=58.3 (need \u226560).; Define missing terms immediately at first use: Heuristic check FAILED: Terms missing definitions near first use: retrieval.",
-      "next_attempt_result": "beginner_language PASSED"
-    },
-    {
-      "failed_checkpoint": "no_unexplained_jargon",
-      "why": "LLM check OK, but heuristic jargon check failed: Heuristic check FAILED: Terms missing definitions near first use: retrieval.",
-      "retry_instruction": "Generator was instructed to apply retry instruction: Simplify sentence structures: Readability too complex: Flesch=58.3 (need \u226560).; Define missing terms immediately at first use: Heuristic check FAILED: Terms missing definitions near first use: retrieval.",
-      "next_attempt_result": "no_unexplained_jargon PASSED"
-    }
-  ]
+  "corrections": []
 }

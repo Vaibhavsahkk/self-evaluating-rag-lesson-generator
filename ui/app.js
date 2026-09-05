@@ -314,18 +314,13 @@ async function renderTrace() {
 function reconstructEntries(logData) {
   if (!logData || !Array.isArray(logData.corrections)) return [];
   // The on-disk log stores one flat correction per failed checkpoint per
-  // attempt; attempt numbers run 1..N in order for failures, and each
-  // correction carries its own next-attempt result.
-  let attempt = 0;
-  return logData.corrections.map((c) => {
-    attempt += 1;
-    return {
-      attempt_number: c.attempt_number || attempt,
-      failed_checkpoints: [{ name: c.failed_checkpoint, reason: c.why }],
-      instruction_given_for_next_attempt: c.retry_instruction,
-      next_attempt_result: c.next_attempt_result,
-    };
-  });
+  // attempt. Each correction carries the attempt_number it belongs to.
+  return logData.corrections.map((c, i) => ({
+    attempt_number: c.attempt_number || i + 1,
+    failed_checkpoints: [{ name: c.failed_checkpoint, reason: c.why }],
+    instruction_given_for_next_attempt: c.retry_instruction,
+    next_attempt_result: c.next_attempt_result,
+  }));
 }
 
 /* ── lesson rendering ────────────────────────────────────── */

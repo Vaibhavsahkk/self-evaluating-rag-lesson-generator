@@ -21,6 +21,7 @@ from config import (
     API_RETRY_ATTEMPTS,
     API_RETRY_BACKOFF_BASE,
     LEARNER_PROFILE,
+    READABILITY_FLESCH_MIN,
 )
 from evaluation.readability import check_readability
 from evaluation.jargon import check_jargon_heuristically
@@ -82,11 +83,23 @@ def run_evaluation(lesson_text: str) -> EvaluationResult:
     retry_instructions = list(llm_response.retry_instructions)
 
     if not readability.passed:
-        retry_instructions.append(f"Simplify sentence structures: {readability.detail}")
+        retry_instructions.append(
+            "Rewrite for much simpler readability — you are being evaluated at "
+            f"Flesch >= {READABILITY_FLESCH_MIN} and currently score "
+            f"{readability.flesch_score:.1f}. Concretely: replace long formal words with "
+            "common short ones, split every long sentence into two or three short "
+            "ones (8-15 words each), and remove nested clauses. "
+            f"Details: {readability.detail}"
+        )
 
     if not heuristic_jargon.passed:
         retry_instructions.append(
-            f"Define missing terms immediately at first use: {heuristic_jargon.detail}"
+            "Fix unexplained terms — EITHER remove the term entirely and express "
+            "the idea in plain words, OR define it in beginner-friendly language "
+            "exactly where it first appears. Advanced mathematical or highly "
+            "technical terms (e.g. 'hyper-dimensional manifold', 'non-Euclidean') "
+            "should be REMOVED, not defined — they do not belong in a beginner "
+            f"lesson. Terms needing attention: {heuristic_jargon.detail}"
         )
 
     if not heuristic_grounding.passed:

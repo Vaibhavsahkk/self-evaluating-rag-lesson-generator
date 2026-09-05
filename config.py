@@ -21,8 +21,8 @@ REJECTION_LOG_PATH = str(PROJECT_ROOT / "output" / "rejection_log.json")
 
 # --- Model Configuration ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-GENERATOR_MODEL = os.getenv("GENERATOR_MODEL", "gemini-3.5-flash-lite")
-EVALUATOR_MODEL = os.getenv("EVALUATOR_MODEL", "gemini-3.7-flash")
+GENERATOR_MODEL = os.getenv("GENERATOR_MODEL", "gemini-flash-lite-latest")
+EVALUATOR_MODEL = os.getenv("EVALUATOR_MODEL", "gemini-flash-latest")
 
 # --- Retry Configuration ---
 MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))

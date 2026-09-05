@@ -55,7 +55,7 @@ The evaluator uses six hard pass/fail checkpoints with no partial credit.
 1. **Accurate and Grounded**
    Checks whether the generated lesson is factually correct and consistent with the trusted RAG reference material. The evaluation also guards against unsupported and misleading claims.
 2. **Beginner Language**
-   Checks whether the lesson is appropriate for the target learner. The checkpoint combines programmatic readability validation with LLM-based pedagogical evaluation. The configured readability threshold is a Flesch Reading Ease score of at least 60.
+   Checks whether the lesson is appropriate for the target learner. The checkpoint combines programmatic readability validation with LLM-based pedagogical evaluation. The configured readability threshold is a Flesch Reading Ease score of at least 60 (the generator is prompted to target 65+ for headroom).
 3. **Teaches by Example**
    Checks whether the lesson contains a meaningful example or analogy that helps the learner understand the concept.
 4. **No Unexplained Jargon**
@@ -101,6 +101,8 @@ Memory and self-evolution are treated separately:
 - **Memory** provides persistence across runs and allows previous failure information to be retrieved later.
 - **Self-evolution** uses repeated failure evidence to derive learned guidance that can influence later generation behavior. Learned guidance retains provenance so the historical failures that contributed to the learning can be traced.
 
+Demo runs (`--inject-error`) are stored with a `DEMO:` topic prefix and are **excluded from guidance derivation**. Deliberately injected flaws are not evidence about real generation quality, so they must never shape what the system "learns".
+
 ## Architecture
 
 The main workflow is implemented with **LangGraph**. The project combines deterministic validation with LLM-based evaluation, utilizes SQLite for persistent failure history and learned guidance, and relies on a curated RAG reference to support factual evaluation.
@@ -118,7 +120,7 @@ The repository contains a RAG-specific factual reference which supports evaluati
 Generator and evaluator models are configured through `config.py` defaults and can be overridden with the `GENERATOR_MODEL` and `EVALUATOR_MODEL` environment variables. The runtime model is whatever `.env` (or the environment) provides, so the repository keeps model configuration explicit and reproducible.
 
 ### Final Lesson Document
-`FINAL_INTRODUCTION_TO_RAG_LESSON.docx` is the formatted document version of the accepted lesson (the same content as `output/lesson_output.md` from the passing run), including the two infographics in `assets/`. It is regenerated with `python assets/create_docx.py` and is the file to upload as the submission "Document link" (Google Doc / Notion).
+`FINAL_INTRODUCTION_TO_RAG_LESSON.docx` is generated **directly from** `output/lesson_output.md` (the accepted lesson from the passing run) by `python assets/create_docx.py`, including the two infographics in `assets/`. The script refuses to overwrite the document from a diagnostic (non-passing) draft. It is the file to upload as the submission "Document link" (Google Doc / Notion).
 
 ## Web Console (optional)
 

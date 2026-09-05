@@ -26,7 +26,7 @@ from config import (
     REJECTION_LOG_PATH,
 )
 from evaluation.checkpoints import run_evaluation
-from evaluation.rubric import EvaluationResult, RejectionLog, RejectionEntry
+from evaluation.rubric import EvaluationResult, RejectionEntry
 from graph.prompts import build_generator_messages
 from memory.learning_store import (
     get_learned_guidance,
@@ -245,6 +245,7 @@ def finalize(state: dict) -> dict:
                         next_result = f"{cp_name} PASSED"
                         
             formatted_log["corrections"].append({
+                "attempt_number": entry["attempt_number"],
                 "failed_checkpoint": cp_name,
                 "why": failed_cp["reason"],
                 "retry_instruction": entry["instruction_given_for_next_attempt"],
@@ -266,6 +267,10 @@ def write_memory_node(state: dict) -> dict:
     """
     Persist this run's outcome to SQLite for future
     get_learned_guidance() calls. Memory errors don't crash the run.
+
+    Demo runs (--inject-error) are recorded with a "DEMO:" topic prefix so
+    guidance derivation can exclude them: their failures are deliberately
+    injected artifacts, not evidence about real generation quality.
     """
     print(f"\n[MEMORY] Writing run result to learning store...")
 
@@ -279,15 +284,21 @@ def write_memory_node(state: dict) -> dict:
                 "reason": fc["reason"],
             })
 
+    stored_topic = state["topic"]
+    is_demo = bool(state.get("inject_error_mode"))
+    if is_demo:
+        stored_topic = f"DEMO: {stored_topic}"
+
     write_run_result(
         run_id=state["run_id"],
-        topic=state["topic"],
+        topic=stored_topic,
         final_status=state["final_status"],
         total_attempts=state.get("attempt_count", 1),
         failures=all_failures,
     )
 
-    print(f"[MEMORY] Run result persisted ({len(all_failures)} failure(s) logged).")
+    qualifier = " (demo run — excluded from guidance derivation)" if is_demo else ""
+    print(f"[MEMORY] Run result persisted ({len(all_failures)} failure(s) logged){qualifier}.")
     return {}
 
 

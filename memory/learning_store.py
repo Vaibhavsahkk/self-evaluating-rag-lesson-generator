@@ -105,8 +105,13 @@ def get_learned_guidance(db_path: str | None = None) -> list[str]:
         conn = init_db(db_path)
         cursor = conn.cursor()
 
+        # Demo runs (topic prefixed "DEMO:") inject deliberate flaws; their
+        # failures are not evidence about real generation quality and must
+        # not feed guidance derivation.
         cursor.execute(
-            "SELECT run_id FROM runs ORDER BY timestamp DESC LIMIT ?",
+            "SELECT run_id FROM runs "
+            "WHERE topic NOT LIKE 'DEMO:%' "
+            "ORDER BY timestamp DESC LIMIT ?",
             (LEARNED_GUIDANCE_LOOKBACK_RUNS,),
         )
         recent_run_ids = [row["run_id"] for row in cursor.fetchall()]

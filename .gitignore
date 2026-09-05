@@ -32,6 +32,7 @@ Thumbs.db
 # Local Only (not for GitHub)
 LOOM_RECORDING_SCRIPT.md
 LOOM_CHEAT_SHEET.md
+AUDIT_REPORT.md
 
 # Word lock files
 ~$*.docx
